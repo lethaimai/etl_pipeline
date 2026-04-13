@@ -62,5 +62,8 @@ def run_elt(source, destination):
     subprocess.run(load_command, env=subprocess_env, check=True)
 
 if __name__ == "__main__":
+
+    print("Starting ELT script...")
     # only run the ELT process if this script is executed directly (not imported as a module)
     run_elt(source_config, destination_config)
+    print("ELT process completed successfully!")

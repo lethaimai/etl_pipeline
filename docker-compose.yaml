@@ -35,6 +35,82 @@ services:
       retries: 20
       start_period: 5s
 
+
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    networks:
+      - elt_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+      start_period: 5s
+
+  init-airflow:
+    image: apache/airflow:2.9.3
+    networks:
+      - elt_network
+    environment:
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__WEBSERVER__SECRET_KEY: airflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: bash -c "airflow db migrate && airflow users create -u airflow -p password -f Thai -l Mai -r Admin -e admin@example.com"
+
+  webserver:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    networks:
+      - elt_network
+    environment:
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__WEBSERVER__SECRET_KEY: airflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+      init-airflow:
+        condition: service_completed_successfully
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+    command: webserver
+
+
+  scheduler:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    networks:
+      - elt_network
+    environment:
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__WEBSERVER__SECRET_KEY: airflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+      init-airflow:
+        condition: service_completed_successfully
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags # reads DAG files to kow what tasks to schedule
+      - ./elt:/opt/airflow/elt # the scheduler executes elt_script.py as a PythoOperator task
+      - /var/run/docker.sock:/var/run/docker.sock # the scheduler uses DocjerOperator to spin up the dbt container, so it needs access to the Docker socket
+    command: scheduler
+
+
 networks:
   elt_network:
     driver: bridge
