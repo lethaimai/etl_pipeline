@@ -2,6 +2,7 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.providers.docker.operators.docker import DockerOperator 
 from datetime import datetime
+from docker.types import Mount
 import sys 
 sys.path.insert(0, "/opt/airflow/elt")
 from elt_script import run_elt
@@ -44,11 +45,25 @@ with DAG(
     )
 
     task2 = DockerOperator(
-        task_id= "dbt_run",
-        image= "ghcr.io/dbt-labs/dbt-postgres:1.8.2",
-        command= "run --profiles-dir /root/.dbt --project-dir /dbt",
-        network_mode= "elt_pipeline_elt_network", # use the same Docker network as the postgres containers to allow connectivity
-        auto_remove= True
+        task_id="dbt_run",
+        image="ghcr.io/dbt-labs/dbt-postgres:1.8.2",
+        command="run --profiles-dir /root/.dbt --project-dir /dbt",
+        network_mode="host",
+        auto_remove=True,
+        force_pull=False,
+        mount_tmp_dir=False,
+        mounts=[
+            Mount(
+                source="/Users/lethaimai/.dbt", 
+                target="/root/.dbt", 
+                type="bind"
+            ),
+            Mount(
+                source="/Users/lethaimai/Desktop/data_bricks_all/etl_pipeline/custom_postgres", 
+                target="/dbt", 
+                type="bind"
+            ),
+        ]
     )
 
     task1 >> task2 # set the task dependencies so that task2 runs after task1

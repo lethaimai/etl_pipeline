@@ -108,6 +108,8 @@ services:
       - ./airflow/dags:/opt/airflow/dags # reads DAG files to kow what tasks to schedule
       - ./elt:/opt/airflow/elt # the scheduler executes elt_script.py as a PythoOperator task
       - /var/run/docker.sock:/var/run/docker.sock # the scheduler uses DockerOperator to spin up the dbt container, so it needs access to the Docker socket
+      - ./custom_postgres:/opt/dbt # the dbt container needs access to the dbt project files to run the transformations, so we mount the custom_postgres directory here as well
+      - ~/.dbt:/root/.dbt # the dbt container needs access to the profiles.yml file for database connection info, so we mount the .dbt directory here
     command: scheduler
 
 
